@@ -36,32 +36,44 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
   }
 
   Future<void> _obtenerDirectorioInicial() async {
-    final customDir = Directory('/storage/emulated/0/NebulaVault');
-    if (!await customDir.exists()) {
-      await customDir.create(recursive: true);
+    // Lista de rutas raíz a explorar
+    final List<String> rutasBase = [
+      '/storage/emulated/0/NebulaVault',
+    ];
+
+    List<Directory> todasLasCarpetas = [];
+
+    for (final ruta in rutasBase) {
+      final baseDir = Directory(ruta);
+      if (!await baseDir.exists()) {
+        await baseDir.create(recursive: true);
+      }
+
+      final subcarpetas = baseDir.listSync().whereType<Directory>().toList();
+      todasLasCarpetas.addAll(subcarpetas);
     }
 
     final prefs = await SharedPreferences.getInstance();
     final savedCovers = await _cargarPortadas();
     final savedFits = prefs.getKeys().fold<Map<String, BoxFit>>({}, (map, key) {
-      if (prefs.getString(key)?.startsWith('fit_') == true) {
-        final rawFit = prefs.getString(key)!.replaceFirst('fit_', '');
-        map[key.replaceFirst('fit_', '')] = _boxFitFromString(rawFit);
+      if (key.startsWith('fit_')) {
+        final rawFit = prefs.getString(key)!;
+        final folderPath = key.replaceFirst('fit_', '');
+        map[folderPath] = _boxFitFromString(rawFit);
       }
       return map;
     });
 
-    final folderList = customDir.listSync().whereType<Directory>().toList();
-
     setState(() {
-      directorio = customDir;
-      folders = folderList;
-      foldersFiltrados = List.from(folderList);
+      directorio = Directory(
+          '/storage/emulated/0/NebulaVault'); // Puedes dejarlo como principal
+      folders = todasLasCarpetas;
+      foldersFiltrados = List.from(todasLasCarpetas);
       portadas = savedCovers;
       portadasFit = savedFits;
     });
 
-    _cargarDetallesDeCarpetas(folderList);
+    _aplicarOrdenamiento();
   }
 
   Future<Map<String, String>> _cargarPortadas() async {
@@ -104,13 +116,25 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
     List<Map<String, dynamic>> nuevaLista = [];
 
     for (var folder in folderList) {
-      final stats = await _obtenerDetallesFolder(folder);
-      nuevaLista.add({
-        'path': folder.path,
+      // Agrega valores iniciales en blanco
+      nuevaLista
+          .add({'path': folder.path, 'sizeMB': '...', 'fileCount': '...'});
+    }
+
+    setState(() {
+      detallesFolder = List.from(nuevaLista);
+    });
+
+    // Carga en segundo plano sin bloquear
+    for (int i = 0; i < folderList.length; i++) {
+      final stats = await _obtenerDetallesFolder(folderList[i]);
+      nuevaLista[i] = {
+        'path': folderList[i].path,
         'sizeMB': stats['sizeMB'],
         'fileCount': stats['fileCount']
-      });
+      };
 
+      // Actualiza la UI solo para ese elemento
       setState(() {
         detallesFolder = List.from(nuevaLista);
       });
@@ -153,8 +177,11 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
         return bCount.compareTo(aCount);
       });
     } else {
-      foldersFiltrados.sort(
-          (a, b) => a.path.split('/').last.compareTo(b.path.split('/').last));
+      foldersFiltrados.sort((a, b) => a.path
+          .split('/')
+          .last
+          .toLowerCase()
+          .compareTo(b.path.split('/').last.toLowerCase()));
     }
   }
 
@@ -225,8 +252,8 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
               ),
             ),
             Positioned(
-              top: 4,
-              right: 4,
+              bottom: 0,
+              right: 0,
               child: PopupMenuButton<String>(
                 onSelected: (value) {
                   if (value == 'editar') {
@@ -237,11 +264,10 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
                 },
                 itemBuilder: (ctx) => [
                   const PopupMenuItem(value: 'editar', child: Text('Editar')),
-                  const PopupMenuItem(value: 'ocultar', child: Text('Ocultar')),
                   const PopupMenuItem(
                       value: 'portada', child: Text('Seleccionar portada')),
                 ],
-                icon: const Icon(Icons.more_vert, size: 20),
+                icon: const Icon(Icons.more_vert, size: 25),
               ),
             ),
           ],
@@ -259,17 +285,17 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
             file.path.toLowerCase().endsWith('.jpg') ||
             file.path.toLowerCase().endsWith('.png') ||
             file.path.toLowerCase().endsWith('.gif') ||
-            file.path.toLowerCase().endsWith('.webp') ||
-            file.path
-                .toLowerCase()
-                .endsWith('.mp4') || // si quieres incluir video thumbnails
-            file.path.toLowerCase().endsWith('.mov'))
+            file.path.toLowerCase().endsWith('.webp'))
         .toList();
 
     if (files.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text("No hay imágenes o videos en esta carpeta")),
+            backgroundColor: Color.fromARGB(221, 65, 65, 65),
+            content: Text(
+              "No hay imágenes en esta carpeta",
+              style: TextStyle(color: Colors.white),
+            )),
       );
       return;
     }
@@ -397,6 +423,26 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
     );
   }
 
+  Future<void> _iniciarCalculoEstadisticas() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(
+          children: const [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text("Calculando estadísticas..."),
+          ],
+        ),
+      ),
+    );
+
+    await _cargarDetallesDeCarpetas(folders);
+
+    Navigator.pop(context); // Cierra el diálogo al terminar
+  }
+
   void _crearNuevoFolder() {
     final TextEditingController _controller = TextEditingController();
 
@@ -446,129 +492,146 @@ class _FolderViewScreenState extends State<FolderViewScreen> {
   Widget build(BuildContext context) {
     final isLoading = directorio == null;
 
+// App bar
     return Scaffold(
       appBar: AppBar(
         title: const Text('Nebula Vault'),
-        actions: [
-          IconButton(
-            icon: Icon(cuadricula ? Icons.view_list : Icons.grid_view),
-            onPressed: _cambiarModoVista,
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.filter_list),
-            onSelected: (value) {
-              setState(() {
-                ordernarPor = value;
-                _aplicarOrdenamiento();
-              });
-            },
-            itemBuilder: (ctx) => [
-              const PopupMenuItem(
-                  value: 'size', child: Text('Ordenar por tamaño')),
-              const PopupMenuItem(
-                  value: 'count', child: Text('Ordenar por cantidad')),
-              const PopupMenuItem(value: 'none', child: Text('A - Z')),
-            ],
-          ),
-          SizedBox(
-            width: MediaQuery.of(context).size.width * 0.4,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
-              child: TextField(
-                onChanged: (valor) {
-                  busqueda = valor;
-                  _filtrarCarpetas(busqueda);
-                },
-                decoration: InputDecoration(
-                  fillColor: Colors.white.withOpacity(0.1),
-                  filled: true,
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-          )
-        ],
+        actions: [],
       ),
+
+      // cuerpo del codigo
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : foldersFiltrados.isEmpty
-              ? const Center(child: Text('No se encontraron carpetas.'))
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Text(
-                        '${foldersFiltrados.length} carpeta${foldersFiltrados.length == 1 ? '' : 's'} encontrada${foldersFiltrados.length == 1 ? '' : 's'}',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      padding: const EdgeInsets.only(left: 0),
+                      child: ElevatedButton.icon(
+                        onPressed: _iniciarCalculoEstadisticas,
+                        icon: const Icon(Icons.calculate),
+                        label: const Text('Ver'),
                       ),
                     ),
-                    Expanded(
-                      child: Scrollbar(
-                        controller: _scrollController,
-                        thumbVisibility: true,
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: cuadricula
-                              ? AnimationLimiter(
-                                  child: GridView.count(
-                                    controller: _scrollController,
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 10,
-                                    mainAxisSpacing: 20,
-                                    children: List.generate(
-                                      foldersFiltrados.length,
-                                      (i) => _vistaCuadriculada(
-                                          foldersFiltrados[i], i),
-                                    ),
-                                  ),
-                                )
-                              : AnimationLimiter(
-                                  child: ListView.separated(
-                                    controller: _scrollController,
-                                    itemCount: foldersFiltrados.length,
-                                    separatorBuilder: (_, __) =>
-                                        const Divider(),
-                                    itemBuilder: (_, i) {
-                                      final folder = foldersFiltrados[i];
-                                      final name = folder.path.split('/').last;
-                                      final stats = detallesFolder.firstWhere(
-                                          (e) => e['path'] == folder.path);
-                                      return ListTile(
-                                        leading: _vistaDeLista(folder),
-                                        title: Center(
-                                          child: Text(
-                                            '$name - ${stats['fileCount']} archivos - ${stats['sizeMB']} MB',
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => ImageListScreen(
-                                                folder: folder,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        onLongPress: () =>
-                                            _setPortadasFolderFromApp(
-                                                folder.path),
-                                      );
-                                    },
-                                  ),
-                                ),
+                    IconButton(
+                      icon:
+                          Icon(cuadricula ? Icons.view_list : Icons.grid_view),
+                      onPressed: _cambiarModoVista,
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.filter_list),
+                      onSelected: (value) {
+                        setState(() {
+                          ordernarPor = value;
+                          _aplicarOrdenamiento();
+                        });
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(
+                            value: 'size', child: Text('Ordenar por tamaño')),
+                        const PopupMenuItem(
+                            value: 'count',
+                            child: Text('Ordenar por cantidad')),
+                        const PopupMenuItem(
+                            value: 'none', child: Text('A - Z')),
+                      ],
+                    ),
+                    SizedBox(
+                      width: MediaQuery.of(context).size.width * 0.45,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 1),
+                        child: TextField(
+                          onChanged: (valor) {
+                            busqueda = valor;
+                            _filtrarCarpetas(busqueda);
+                          },
+                          decoration: InputDecoration(
+                            fillColor: Colors.white.withOpacity(0.1),
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    '${foldersFiltrados.length} carpeta${foldersFiltrados.length == 1 ? '' : 's'} encontrada${foldersFiltrados.length == 1 ? '' : 's'}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
+                ),
+                Expanded(
+                  child: Scrollbar(
+                    controller: _scrollController,
+                    interactive: true,
+                    trackVisibility: true,
+                    scrollbarOrientation: ScrollbarOrientation.right,
+                    thickness: 30,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: cuadricula
+                          ? AnimationLimiter(
+                              child: GridView.count(
+                                controller: _scrollController,
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 10,
+                                mainAxisSpacing: 20,
+                                children: List.generate(
+                                  foldersFiltrados.length,
+                                  (i) => _vistaCuadriculada(
+                                      foldersFiltrados[i], i),
+                                ),
+                              ),
+                            )
+                          : AnimationLimiter(
+                              child: ListView.separated(
+                                controller: _scrollController,
+                                itemCount: foldersFiltrados.length,
+                                separatorBuilder: (_, __) => const Divider(),
+                                itemBuilder: (_, i) {
+                                  final folder = foldersFiltrados[i];
+                                  final name = folder.path.split('/').last;
+                                  final stats = detallesFolder.firstWhere(
+                                      (e) => e['path'] == folder.path);
+                                  return ListTile(
+                                    leading: _vistaDeLista(folder),
+                                    title: Center(
+                                      child: Text(
+                                        '$name - ${stats['fileCount']} archivos - ${stats['sizeMB']} MB',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ImageListScreen(
+                                            folder: folder,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    onLongPress: () =>
+                                        _setPortadasFolderFromApp(folder.path),
+                                  );
+                                },
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -792,12 +855,15 @@ class _VistaPreviaPortadaModalState extends State<VistaPreviaPortadaModal> {
             ],
           ),
           const SizedBox(height: 8),
-          SizedBox(
-            height: 90,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
+          Expanded(
+            child: GridView.builder(
+              padding: const EdgeInsets.all(1),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4, // Número de columnas en la cuadrícula
+                crossAxisSpacing: 6,
+                mainAxisSpacing: 6,
+              ),
               itemCount: widget.files.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (_, i) {
                 final path = widget.files[i].path;
                 return GestureDetector(
@@ -805,8 +871,12 @@ class _VistaPreviaPortadaModalState extends State<VistaPreviaPortadaModal> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      Image.file(File(path),
-                          width: 100, height: 100, fit: BoxFit.cover),
+                      Image.file(
+                        File(path),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      ),
                       if (selectedPath == path)
                         const Icon(Icons.check_circle, color: Colors.green),
                     ],

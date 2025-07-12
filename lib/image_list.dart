@@ -20,7 +20,7 @@ class ImageListScreen extends StatefulWidget {
   State<ImageListScreen> createState() => _ImageListScreenState();
 }
 
-enum FiltroTipo { diaMesAno, mesAno, ano, peso }
+enum FiltroTipo { diaMesAno, mesAno, ano }
 
 class _ImageListScreenState extends State<ImageListScreen> {
   bool isGridView = true;
@@ -81,14 +81,20 @@ class _ImageListScreenState extends State<ImageListScreen> {
         ext.endsWith('.mkv');
   }
 
+  final Map<String, Uint8List> _thumbnailCache = {};
+
   Future<ImageProvider> _getThumbnail(File file) async {
     if (_isVideo(file.path)) {
+      if (_thumbnailCache.containsKey(file.path)) {
+        return MemoryImage(_thumbnailCache[file.path]!);
+      }
       final thumb = await VideoThumbnail.thumbnailData(
         video: file.path,
         imageFormat: ImageFormat.JPEG,
         maxWidth: 200,
-        quality: 70,
+        quality: 50,
       );
+      if (thumb != null) _thumbnailCache[file.path] = thumb;
       return MemoryImage(thumb ?? Uint8List(0));
     } else {
       return FileImage(file);
@@ -107,7 +113,6 @@ class _ImageListScreenState extends State<ImageListScreen> {
               _filtroOption(FiltroTipo.diaMesAno, "Día-Mes-Año"),
               _filtroOption(FiltroTipo.mesAno, "Mes-Año"),
               _filtroOption(FiltroTipo.ano, "Años"),
-              _filtroOption(FiltroTipo.peso, "Peso"),
             ],
           ),
         );
@@ -131,15 +136,9 @@ class _ImageListScreenState extends State<ImageListScreen> {
 
   List<File> _applySorting(List<File> files) {
     files.sort((a, b) {
-      if (filtroSeleccionado == FiltroTipo.peso) {
-        return ascending
-            ? a.lengthSync().compareTo(b.lengthSync())
-            : b.lengthSync().compareTo(a.lengthSync());
-      } else {
-        return ascending
-            ? a.lastModifiedSync().compareTo(b.lastModifiedSync())
-            : b.lastModifiedSync().compareTo(a.lastModifiedSync());
-      }
+      return ascending
+          ? a.lastModifiedSync().compareTo(b.lastModifiedSync())
+          : b.lastModifiedSync().compareTo(a.lastModifiedSync());
     });
     return files;
   }
@@ -158,9 +157,6 @@ class _ImageListScreenState extends State<ImageListScreen> {
           break;
         case FiltroTipo.ano:
           key = DateFormat('yyyy').format(date);
-          break;
-        case FiltroTipo.peso:
-          key = 'Todos';
           break;
       }
       grouped.putIfAbsent(key, () => []).add(file);
@@ -303,19 +299,26 @@ class _ImageListScreenState extends State<ImageListScreen> {
           final files = entry.value;
 
           return SliverList(
-            delegate: SliverChildListDelegate([
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Text(
-                  groupLabel,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              isGridView ? _buildGridSection(files) : _buildListSection(files),
-            ]),
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                if (i == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Text(groupLabel,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        )),
+                  );
+                } else {
+                  return isGridView
+                      ? _buildGridSection(files)
+                      : _buildListSection(files);
+                }
+              },
+              childCount: 2, // 1 para el título + 1 para el contenido
+            ),
           );
         }).toList(),
       ),
@@ -378,46 +381,52 @@ class _ImageListScreenState extends State<ImageListScreen> {
                     ),
                   if (selectionMode)
                     Positioned(
-                      top: 4,
-                      right: 4,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // ✅ Botón de pantalla completa
-
-                          // ✅ Botón de selección
-                          GestureDetector(
-                            onTap: () => _toggleSelection(file),
-                            child: Icon(
-                              isSelected
-                                  ? Icons.check_circle
-                                  : Icons.radio_button_unchecked,
-                              color: Colors.white,
-                            ),
-                          ),
-
-                          GestureDetector(
-                            onTap: () {
-                              final List<File> filterlist = groupedFiles.entries
-                                  .expand((e) => e.value)
-                                  .toList();
-
-                              final int i = filterlist.indexOf(file);
-
-                              showDialog(
-                                context: context,
-                                builder: (_) => FullImageView(
-                                    allFiles: filterlist, initialIndex: i),
-                              );
-                            },
-                            child: const Padding(
-                              padding: EdgeInsets.only(top: 8),
-                              child: Icon(
-                                Icons.fullscreen,
-                                color: Colors.white,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              GestureDetector(
+                                onTap: () => _toggleSelection(file),
+                                child: Icon(
+                                  isSelected
+                                      ? Icons.check_circle
+                                      : Icons.radio_button_unchecked,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
+                            ],
                           ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  final List<File> filterlist = groupedFiles
+                                      .entries
+                                      .expand((e) => e.value)
+                                      .toList();
+
+                                  final int i = filterlist.indexOf(file);
+
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => FullImageView(
+                                        allFiles: filterlist, initialIndex: i),
+                                  );
+                                },
+                                child: const Padding(
+                                  padding: EdgeInsets.only(top: 8),
+                                  child: Icon(
+                                    Icons.fullscreen,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
                         ],
                       ),
                     ),
@@ -582,9 +591,6 @@ class _FullImageViewState extends State<FullImageView> {
 
   @override
   Widget build(BuildContext context) {
-    final currentFile = widget.allFiles[_currentIndex];
-    final isVideo = _isVideo(currentFile.path);
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: GestureDetector(
@@ -614,22 +620,21 @@ class _FullImageViewState extends State<FullImageView> {
                       child: VideoPlayer(_videoController!),
                     ),
                   );
-                } else {
-                  return PhotoViewGallery.builder(
-                    pageController: PageController(initialPage: index),
-                    itemCount: 1,
-                    backgroundDecoration:
-                        const BoxDecoration(color: Colors.black),
-                    builder: (context, _) {
-                      return PhotoViewGalleryPageOptions(
-                        imageProvider: FileImage(file),
-                        minScale: PhotoViewComputedScale.contained,
-                        maxScale: PhotoViewComputedScale.covered * 3.0,
-                        heroAttributes: PhotoViewHeroAttributes(tag: file.path),
-                      );
-                    },
-                  );
                 }
+
+                // Para imagenes: zoom que funciona bien con fotos pequeñas
+                return InteractiveViewer(
+                  panEnabled: true,
+                  scaleEnabled: true,
+                  minScale: 1.0,
+                  maxScale: 4.0,
+                  child: SizedBox.expand(
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: Image.file(file),
+                    ),
+                  ),
+                );
               },
             ),
             if (_showControls)
@@ -643,7 +648,7 @@ class _FullImageViewState extends State<FullImageView> {
                   ),
                 ),
               ),
-            if (isVideo &&
+            if (_isVideo(widget.allFiles[_currentIndex].path) &&
                 _videoController != null &&
                 _videoController!.value.isInitialized &&
                 _showControls)
@@ -687,6 +692,19 @@ class _FullImageViewState extends State<FullImageView> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           IconButton(
+                            icon: const Icon(Icons.replay_10,
+                                color: Colors.white),
+                            onPressed: () {
+                              final newPosition =
+                                  _videoController!.value.position -
+                                      const Duration(seconds: 10);
+                              _videoController!.seekTo(
+                                  newPosition > Duration.zero
+                                      ? newPosition
+                                      : Duration.zero);
+                            },
+                          ),
+                          IconButton(
                             icon:
                                 const Icon(Icons.replay_5, color: Colors.white),
                             onPressed: () {
@@ -728,6 +746,19 @@ class _FullImageViewState extends State<FullImageView> {
                               }
                             },
                           ),
+                          IconButton(
+                            icon: const Icon(Icons.forward_10,
+                                color: Colors.white),
+                            onPressed: () {
+                              final newPosition =
+                                  _videoController!.value.position +
+                                      const Duration(seconds: 10);
+                              if (newPosition <
+                                  _videoController!.value.duration) {
+                                _videoController!.seekTo(newPosition);
+                              }
+                            },
+                          ),
                         ],
                       ),
                     ],
@@ -740,8 +771,11 @@ class _FullImageViewState extends State<FullImageView> {
     );
   }
 
+  final _photoViewScaleController = PhotoViewScaleStateController();
+
   @override
   void dispose() {
+    _photoViewScaleController.dispose();
     _pageController.dispose();
     _videoController?.dispose();
     _videoUpdateTimer?.cancel();
