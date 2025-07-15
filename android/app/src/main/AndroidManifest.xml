@@ -17,7 +17,7 @@
         tools:ignore="ScopedStorage" />
 
     <application
-        android:label="nebula_vault"
+        android:label="Nebula Vault"
         android:icon="@mipmap/ic_launcher"
         android:requestLegacyExternalStorage="true"
         android:name="io.flutter.app.FlutterMultiDexApplication">

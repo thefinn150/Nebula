@@ -130,6 +130,17 @@ class _FolderListScreenState extends State<FolderListScreen> {
       '/storage/emulated/0/DCIM',
       '/storage/emulated/0/Movies',
       '/storage/emulated/0/Music',
+      '/storage/emulated/0/snaptube/download/Snaptube Video',
+      '/storage/emulated/0/Pictures/Screenshots',
+      '/storage/emulated/0/Pictures/Twitter',
+      '/storage/emulated/0/Pictures/Instagram',
+      '/storage/emulated/0/Pictures/Threads',
+      '/storage/emulated/0/Pictures/Facebook',
+      '/storage/emulated/0/Pictures/Messenger',
+      '/storage/emulated/0/Pictures/100PINT/pins',
+      '/storage/emulated/0/DCIM/100PINT/Pines',
+      '/storage/emulated/0/DCIM/Facebook',
+      '/storage/emulated/0/DCIM/Camera',
     ];
 
     for (final path in flatPaths) {
