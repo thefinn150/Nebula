@@ -1,14 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:nebula_vault/screens/folder-list.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:nebula_vault/screens/listaCarpetas.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-void main() => runApp(NebulaVaultApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('es', null);
+  runApp(GaleriaApp());
+}
 
-class NebulaVaultApp extends StatelessWidget {
+class GaleriaApp extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: 'NebulaVault',
-        theme: ThemeData.dark(),
-        home: FolderListScreen(),
-        debugShowCheckedModeBanner: false,
-      );
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Galería',
+      theme: ThemeData.dark(useMaterial3: true),
+      locale: const Locale('es'),
+      supportedLocales: const [
+        Locale('es'),
+        Locale('en'), // puedes dejar esto por compatibilidad
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: GaleriaHome(),
+    );
+  }
 }

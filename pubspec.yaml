@@ -9,6 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations: # 🟢 Soporte de localización
+    sdk: flutter
+
   permission_handler: ^11.3.1
   photo_view: ^0.14.0
   image_picker: ^1.0.7
@@ -32,6 +35,8 @@ dependencies:
   cupertino_icons: ^1.0.6
   extended_image: ^8.1.1
   photo_manager_image_provider: ^2.1.0
+  sticky_headers: ^0.3.0
+
   chewie:
     path: chewie-1.8.7 # Ruta local a tu copia modificada
 
