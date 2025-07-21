@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:nebula_vault/screens/listaImagenes.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:typed_data';
+import 'package:extended_image/extended_image.dart';
+import 'package:nebula_vault/screens/pantallaCompleta.dart';
 
 class GaleriaHome extends StatefulWidget {
   @override
   _GaleriaHomeState createState() => _GaleriaHomeState();
+}
+
+class CustomAssetPath {
+  final String name;
+  final List<AssetEntity> assets;
+
+  CustomAssetPath({required this.name, required this.assets});
 }
 
 class _GaleriaHomeState extends State<GaleriaHome> {
@@ -12,11 +23,32 @@ class _GaleriaHomeState extends State<GaleriaHome> {
   List<AssetPathEntity> filteredFolders = [];
   bool isLoading = true;
   String searchQuery = '';
+  int _selectedIndex = 0;
+  Set<String> favorites = {};
+  List<AssetEntity> favFiles = [];
 
   @override
   void initState() {
     super.initState();
     _loadFolders();
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    favorites = prefs.getStringList('favorites')?.toSet() ?? {};
+    _loadFavs();
+    setState(() {});
+  }
+
+  Future<void> _loadFavs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList('favorites') ?? [];
+    final futures = ids.map((id) => AssetEntity.fromId(id));
+    final results = await Future.wait(futures);
+    setState(() {
+      favFiles = results.whereType<AssetEntity>().toList();
+    });
   }
 
   Future<void> _loadFolders() async {
@@ -103,7 +135,7 @@ class _GaleriaHomeState extends State<GaleriaHome> {
       parts.add(Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('🎞️', style: TextStyle(fontSize: 16)), // emoji gif
+          const Text('🎞️', style: TextStyle(fontSize: 16)),
           const SizedBox(width: 4),
           Text('${counts['gifs']}'),
         ],
@@ -133,61 +165,136 @@ class _GaleriaHomeState extends State<GaleriaHome> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Nebula Vault')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: TextField(
-              onChanged: _filterFolders,
-              decoration: InputDecoration(
-                hintText: 'Buscar carpeta...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+  Widget _buildInicioView() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: TextField(
+            onChanged: _filterFolders,
+            decoration: InputDecoration(
+              hintText: 'Buscar carpeta...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: filteredFolders.length,
-              itemBuilder: (_, i) {
-                final folder = filteredFolders[i];
-                return FutureBuilder<Map<String, int>>(
-                  future: _countAssetsByType(folder),
-                  builder: (_, snapshot) {
-                    if (!snapshot.hasData) {
-                      return ListTile(
-                        title: Text(folder.name),
-                        subtitle: const Text('Cargando...'),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                      );
-                    }
-
-                    final counts = snapshot.data!;
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: filteredFolders.length,
+            itemBuilder: (_, i) {
+              final folder = filteredFolders[i];
+              return FutureBuilder<Map<String, int>>(
+                future: _countAssetsByType(folder),
+                builder: (_, snapshot) {
+                  if (!snapshot.hasData) {
                     return ListTile(
                       title: Text(folder.name),
-                      subtitle: _buildSubtitleAndIcons(counts),
+                      subtitle: const Text('Cargando...'),
                       trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => FileListScreen(folder: folder),
-                        ),
+                    );
+                  }
+
+                  final counts = snapshot.data!;
+                  return ListTile(
+                    title: Text(folder.name),
+                    subtitle: _buildSubtitleAndIcons(counts),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FileListScreen(folder: folder),
                       ),
+                    ).then((_) {
+                      _loadFolders();
+                      _loadFavorites();
+                    }),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    if (_selectedIndex == 0) {
+      return isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _buildInicioView();
+    } else if (_selectedIndex == 1) {
+      return isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _buildFavoritos(context);
+    } else {
+      return const Center(child: Text('Más (en construcción)'));
+    }
+  }
+
+  @override
+  Widget _buildFavoritos(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Favoritos')),
+      body: favFiles.isEmpty
+          ? Center(child: Text('No hay favoritos'))
+          : GridView.builder(
+              padding: const EdgeInsets.all(4),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3, mainAxisSpacing: 4, crossAxisSpacing: 4),
+              itemCount: favFiles.length,
+              itemBuilder: (_, i) {
+                final file = favFiles[i];
+                return FutureBuilder<Uint8List?>(
+                  future:
+                      file.thumbnailDataWithSize(const ThumbnailSize(300, 300)),
+                  builder: (_, snap) {
+                    if (!snap.hasData) return SizedBox.shrink();
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  ViewerScreen(files: favFiles, index: i)),
+                        );
+                      },
+                      child: ExtendedImage.memory(snap.data!,
+                          fit: BoxFit.cover, cacheRawData: true),
                     );
                   },
                 );
               },
             ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Nebula Vault')),
+      body: _buildBody(),
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Theme.of(context).colorScheme.shadow,
+        enableFeedback: false,
+        showSelectedLabels: false,
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            label: 'Inicio',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite_border),
+            label: 'Favoritos',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.more_horiz),
+            label: 'Más',
           ),
         ],
       ),

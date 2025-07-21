@@ -2,17 +2,17 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.nebula_vault">
 
-    <!-- ✅ Permisos para Android 10 y anteriores -->
+    <!-- Permisos para Android 10 y anteriores -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
-    <!-- ✅ Permisos para Android 13 y 14 -->
+    <!-- Permisos para Android 13 y 14 -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
 
-    <!-- ✅ Permiso especial para mover/eliminar archivos en Android 11+ -->
+    <!-- Permiso especial para mover/eliminar archivos en Android 11+ -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
@@ -20,7 +20,8 @@
         android:label="Nebula Vault"
         android:icon="@mipmap/ic_launcher"
         android:requestLegacyExternalStorage="true"
-        android:name="io.flutter.app.FlutterMultiDexApplication">
+        android:name="io.flutter.app.FlutterMultiDexApplication"
+        tools:ignore="ScopedStorage">
 
         <activity
             android:name=".MainActivity"
