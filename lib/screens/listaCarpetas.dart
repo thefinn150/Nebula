@@ -1,3 +1,5 @@
+// ignore_for_file: override_on_non_overriding_member
+
 import 'package:flutter/material.dart';
 import 'package:nebula_vault/screens/listaImagenes.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -240,7 +242,7 @@ class _GaleriaHomeState extends State<GaleriaHome> {
     return Scaffold(
       appBar: AppBar(title: const Text('Favoritos')),
       body: favFiles.isEmpty
-          ? Center(child: Text('No hay favoritos'))
+          ? const Center(child: Text('No hay favoritos'))
           : GridView.builder(
               padding: const EdgeInsets.all(4),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -252,7 +254,7 @@ class _GaleriaHomeState extends State<GaleriaHome> {
                   future:
                       file.thumbnailDataWithSize(const ThumbnailSize(300, 300)),
                   builder: (_, snap) {
-                    if (!snap.hasData) return SizedBox.shrink();
+                    if (!snap.hasData) return const SizedBox.shrink();
                     return GestureDetector(
                       onTap: () {
                         Navigator.push(
