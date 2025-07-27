@@ -15,6 +15,7 @@ class GaleriaApp extends StatelessWidget {
     return MaterialApp(
       title: 'Galería',
       theme: ThemeData.dark(useMaterial3: true),
+      debugShowCheckedModeBanner: false,
       locale: const Locale('es'),
       supportedLocales: const [
         Locale('es'),

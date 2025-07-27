@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_print, use_build_context_synchronously, unnecessary_null_comparison, sort_child_properties_last, use_key_in_widget_constructors, library_private_types_in_public_api, prefer_const_constructors_in_immutables, prefer_interpolation_to_compose_strings
+// ignore_for_file: avoid_print, use_build_context_synchronously, unnecessary_null_comparison, sort_child_properties_last, use_key_in_widget_constructors, library_private_types_in_public_api, prefer_const_constructors_in_immutables, prefer_interpolation_to_compose_strings, unused_local_variable
 
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -271,6 +271,7 @@ class _FileListScreenState extends State<FileListScreen> {
                               builder: (_) => ViewerScreen(
                                 files: currentList,
                                 index: globalIndex,
+                                nameFolder: widget.folder.name,
                               ),
                             ),
                           );
@@ -394,6 +395,7 @@ class _FileListScreenState extends State<FileListScreen> {
                                 builder: (_) => ViewerScreen(
                                   files: currentList,
                                   index: globalIndex,
+                                  nameFolder: widget.folder.name,
                                 ),
                               ),
                             );

@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously, use_key_in_widget_constructors, library_private_types_in_public_api, prefer_const_constructors_in_immutables
+// ignore_for_file: use_build_context_synchronously, use_key_in_widget_constructors, library_private_types_in_public_api, prefer_const_constructors_in_immutables, prefer_interpolation_to_compose_strings
 
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -13,8 +13,10 @@ import 'package:chewie/chewie.dart';
 class ViewerScreen extends StatefulWidget {
   final List<AssetEntity> files;
   final int index;
+  final String nameFolder;
 
-  ViewerScreen({required this.files, required this.index});
+  ViewerScreen(
+      {required this.files, required this.index, required this.nameFolder});
 
   @override
   _ViewerScreenState createState() => _ViewerScreenState();
@@ -34,6 +36,8 @@ class _ViewerScreenState extends State<ViewerScreen> {
   @override
   void initState() {
     super.initState();
+    current = widget.index;
+
     current = widget.index;
     _pageController = ExtendedPageController(initialPage: current);
     _prepareVideo();
@@ -188,6 +192,26 @@ class _ViewerScreenState extends State<ViewerScreen> {
                 favorites =
                     await agregarFavorito(context, widget.files[current]);
                 _cargarFavoritos();
+                setState(() {});
+              },
+            ),
+
+            IconButton(
+              icon: //favorites.contains(widget.files[current].id)
+                  const Icon(Icons.image_outlined, color: Colors.white),
+              tooltip: 'Agregar a favoritos',
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.grey,
+              ),
+              focusColor: Colors.white,
+              splashColor: Colors.white,
+              onPressed: () async {
+                await setFolderThumbnail(
+                  context: context,
+                  folderName: widget.nameFolder,
+                  asset: widget.files[current],
+                );
+
                 setState(() {});
               },
             ),
