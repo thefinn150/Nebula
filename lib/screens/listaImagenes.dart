@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_print, use_build_context_synchronously, unnecessary_null_comparison, sort_child_properties_last, use_key_in_widget_constructors, library_private_types_in_public_api, prefer_const_constructors_in_immutables
+// ignore_for_file: avoid_print, use_build_context_synchronously, unnecessary_null_comparison, sort_child_properties_last, use_key_in_widget_constructors, library_private_types_in_public_api, prefer_const_constructors_in_immutables, prefer_interpolation_to_compose_strings
 
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -35,10 +35,12 @@ class _FileListScreenState extends State<FileListScreen> {
   List<String> orderedGifDates = [];
   List<String> orderedVideoDates = [];
 
+  List<String> selectedDates = [];
+
   bool isLoading = true;
   bool sortVideosByDuration = false;
 
-  String selectedFilter = 'Imágenes'; // Imágenes, GIFs, Videos
+  String selectedFilter = 'Imágenes';
 
   Set<String> selectedIds = {};
   Set<String> favorites = {};
@@ -96,25 +98,6 @@ class _FileListScreenState extends State<FileListScreen> {
 
       isLoading = false;
     });
-  }
-
-  Future<String?> _buscarNombreCarpeta(BuildContext ctx, String title) async {
-    String name = '';
-    return showDialog<String>(
-      context: ctx,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: TextField(onChanged: (v) => name = v),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("Cancelar")),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, name),
-              child: const Text("OK")),
-        ],
-      ),
-    );
   }
 
   List<AssetEntity> _getOrderedVisibleList() {
@@ -206,16 +189,55 @@ class _FileListScreenState extends State<FileListScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title, String date) {
     return SliverToBoxAdapter(
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        color: Colors.black,
-        child: Text(
-          title,
-          style: const TextStyle(
-              fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+        color: Colors.black12,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            IconButton(
+              icon: selectedDates.contains(date)
+                  ? Icon(Icons.circle_rounded, color: Colors.blueAccent)
+                  : Icon(Icons.circle_outlined, color: Colors.white),
+              onPressed: () async {
+                selectedDates.contains(date)
+                    ? selectedDates.remove(date)
+                    : selectedDates.add(date);
+
+                setState(() {});
+                final Map<String, List<AssetEntity>> grouped = {
+                  'Imágenes': groupedImages,
+                  'GIFs': groupedGifs,
+                  'Videos': groupedVideos,
+                }[selectedFilter]!;
+
+                if (!selectedDates.contains(date)) {
+                  for (var asset in grouped[date]!) {
+                    selectedIds.remove(asset.id);
+                  }
+                } else {
+                  for (var asset in grouped[date]!) {
+                    selectedIds.add(asset.id);
+                  }
+                }
+                print("*****************" + selectedIds.toString());
+                isSel = true;
+                print("*****************" + isSel.toString());
+                setState(() {});
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -254,7 +276,6 @@ class _FileListScreenState extends State<FileListScreen> {
                           );
 
                           if (actualizado == true) {
-                            // ✅ Recarga archivos y favoritos si hubo cambios
                             _cargarArchivos();
                             _cargarFavoritos();
                           }
@@ -290,11 +311,14 @@ class _FileListScreenState extends State<FileListScreen> {
                               : favorites.contains(file.id)
                                   ? Colors.amber
                                   : Colors.transparent,
-                          width: 3,
+                          width: 5,
                         ),
                         snapshot.data!,
                         fit: BoxFit.cover,
                         cacheRawData: true,
+                        opacity: selectedIds.contains(file.id)
+                            ? const AlwaysStoppedAnimation(0.3)
+                            : const AlwaysStoppedAnimation(1.0),
                       ),
                     ),
                     if (isVideo)
@@ -302,23 +326,24 @@ class _FileListScreenState extends State<FileListScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: GestureDetector(
-                              onTap: () async {
-                                favorites =
-                                    await agregarFavorito(context, file);
-                                setState(() {});
-                              },
-                              child: Icon(
-                                favorites.contains(file.id)
-                                    ? Icons.star
-                                    : Icons.star_border,
-                                color: Colors.yellowAccent,
+                          if (isSel == false)
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  favorites =
+                                      await agregarFavorito(context, file);
+                                  setState(() {});
+                                },
+                                child: Icon(
+                                  favorites.contains(file.id)
+                                      ? Icons.star
+                                      : Icons.star_border,
+                                  color: Colors.yellowAccent,
+                                ),
                               ),
                             ),
-                          ),
                           Positioned(
                             bottom: 4,
                             right: 4,
@@ -338,7 +363,7 @@ class _FileListScreenState extends State<FileListScreen> {
                           )
                         ],
                       )
-                    else
+                    else if (isSel == false)
                       Positioned(
                         top: 4,
                         right: 4,
@@ -354,7 +379,31 @@ class _FileListScreenState extends State<FileListScreen> {
                             color: Colors.yellowAccent,
                           ),
                         ),
-                      ),
+                      )
+                    else if (isSel == true)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: () async {
+                            final currentList = _getOrderedVisibleList();
+                            final globalIndex = currentList.indexOf(file);
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ViewerScreen(
+                                  files: currentList,
+                                  index: globalIndex,
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Icon(
+                            Icons.fullscreen,
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
                   ],
                 );
               },
@@ -403,6 +452,12 @@ class _FileListScreenState extends State<FileListScreen> {
       'Videos': orderedVideoDates,
     }[selectedFilter]!;
 
+    final int itemCount = orderedDates.isEmpty
+        ? 0
+        : orderedDates
+            .map((date) => grouped[date]!.length)
+            .reduce((a, b) => a + b);
+
     return Scrollbar(
       interactive: true,
       thickness: 30,
@@ -412,7 +467,8 @@ class _FileListScreenState extends State<FileListScreen> {
         controller: _scrollController,
         slivers: [
           for (var date in orderedDates) ...[
-            _buildSectionHeader(date),
+            _buildSectionHeader(
+                date + " (" + grouped[date]!.length.toString() + ")", date),
             _buildGrid(grouped[date]!),
           ]
         ],
@@ -424,7 +480,13 @@ class _FileListScreenState extends State<FileListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.folder.name),
+        title: !isSel
+            ? Text(widget.folder.name + " (" + files.length.toString() + ")")
+            : Text(" (" +
+                selectedIds.length.toString() +
+                " de " +
+                files.length.toString() +
+                ")"),
         actions: [
           Row(
             children: [

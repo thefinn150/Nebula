@@ -1,12 +1,15 @@
-// ignore_for_file: override_on_non_overriding_member
+// ignore_for_file: override_on_non_overriding_member, prefer_adjacent_string_concatenation, prefer_interpolation_to_compose_strings
 
 import 'package:flutter/material.dart';
 import 'package:nebula_vault/screens/listaImagenes.dart';
+import 'package:nebula_vault/utils/metodosGlobales.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
 import 'package:extended_image/extended_image.dart';
 import 'package:nebula_vault/screens/pantallaCompleta.dart';
+import 'package:flutter/material.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class GaleriaHome extends StatefulWidget {
   @override
@@ -209,9 +212,11 @@ class _GaleriaHomeState extends State<GaleriaHome> {
                       MaterialPageRoute(
                         builder: (_) => FileListScreen(folder: folder),
                       ),
-                    ).then((_) {
-                      _loadFolders();
+                    ).then((_) async {
+                      await _loadFolders();
                       _loadFavorites();
+                      _filterFolders(
+                          searchQuery); // <--- volver a aplicar filtro activo
                     }),
                   );
                 },
@@ -240,13 +245,17 @@ class _GaleriaHomeState extends State<GaleriaHome> {
   @override
   Widget _buildFavoritos(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Favoritos')),
+      appBar: AppBar(
+          title: Text('Favoritos' + " (" + favFiles.length.toString() + ")")),
       body: favFiles.isEmpty
           ? const Center(child: Text('No hay favoritos'))
           : GridView.builder(
               padding: const EdgeInsets.all(4),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3, mainAxisSpacing: 4, crossAxisSpacing: 4),
+                crossAxisCount: 3,
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+              ),
               itemCount: favFiles.length,
               itemBuilder: (_, i) {
                 final file = favFiles[i];
@@ -255,17 +264,46 @@ class _GaleriaHomeState extends State<GaleriaHome> {
                       file.thumbnailDataWithSize(const ThumbnailSize(300, 300)),
                   builder: (_, snap) {
                     if (!snap.hasData) return const SizedBox.shrink();
-                    return GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  ViewerScreen(files: favFiles, index: i)),
-                        );
-                      },
-                      child: ExtendedImage.memory(snap.data!,
-                          fit: BoxFit.cover, cacheRawData: true),
+
+                    return Stack(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ViewerScreen(files: favFiles, index: i),
+                              ),
+                            );
+                          },
+                          child: ExtendedImage.memory(
+                            snap.data!,
+                            fit: BoxFit.cover,
+                            cacheRawData: true,
+                            width: double.infinity,
+                            height: double.infinity,
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () async {
+                              favorites = await agregarFavorito(context, file);
+
+                              _loadFavorites();
+                              setState(() {});
+                            },
+                            child: Icon(
+                              favorites.contains(file.id)
+                                  ? Icons.star
+                                  : Icons.star_border,
+                              color: Colors.yellowAccent,
+                            ),
+                          ),
+                        ),
+                      ],
                     );
                   },
                 );

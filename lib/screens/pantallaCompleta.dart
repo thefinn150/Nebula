@@ -6,6 +6,7 @@ import 'package:nebula_vault/utils/detallesArchivo.dart';
 import 'package:nebula_vault/utils/metodosGlobales.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:extended_image/extended_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 
@@ -28,12 +29,21 @@ class _ViewerScreenState extends State<ViewerScreen> {
   bool isLoadingMove = false;
   bool isLoadingDelete = false;
 
+  Set<String> favorites = {};
+
   @override
   void initState() {
     super.initState();
     current = widget.index;
     _pageController = ExtendedPageController(initialPage: current);
     _prepareVideo();
+    _cargarFavoritos();
+  }
+
+  Future<void> _cargarFavoritos() async {
+    final prefs = await SharedPreferences.getInstance();
+    favorites = prefs.getStringList('favorites')?.toSet() ?? {};
+    setState(() {});
   }
 
   Future<void> _prepareVideo() async {
@@ -160,6 +170,26 @@ class _ViewerScreenState extends State<ViewerScreen> {
               focusColor: Colors.blueAccent,
               splashColor: Colors.blue,
               onPressed: () => mostrarDetalles(context, widget.files[current]),
+            ),
+
+            IconButton(
+              icon: favorites.contains(widget.files[current].id)
+                  ? const Icon(Icons.star, color: Colors.yellowAccent)
+                  : const Icon(Icons.star_border, color: Colors.white),
+              tooltip: 'Agregar a favoritos',
+              style: IconButton.styleFrom(
+                backgroundColor: favorites.contains(widget.files[current].id)
+                    ? Colors.yellowAccent.withOpacity(0.5)
+                    : Colors.grey.withOpacity(0.5),
+              ),
+              focusColor: Colors.yellowAccent,
+              splashColor: Colors.yellow,
+              onPressed: () async {
+                favorites =
+                    await agregarFavorito(context, widget.files[current]);
+                _cargarFavoritos();
+                setState(() {});
+              },
             ),
 
             // Eliminar

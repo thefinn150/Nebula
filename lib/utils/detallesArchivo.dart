@@ -22,6 +22,7 @@ Future<void> mostrarDetalles(BuildContext context, AssetEntity asset) async {
         'Nombre': file.uri.pathSegments.last,
         'Ruta': file.path,
         'Tipo': asset.mimeType ?? 'Desconocido',
+        'Dimensiones': '${asset.width} x ${asset.height} px',
         'Tamaño':
             '${(file.lengthSync() / (1024 * 1024)).toStringAsFixed(2)} MB',
         'Fecha creación': asset.createDateTime.toString(),
