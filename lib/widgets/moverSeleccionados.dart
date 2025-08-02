@@ -1,8 +1,10 @@
-// ignore_for_file: use_build_context_synchronously, avoid_print, unnecessary_null_comparison
+// ignore_for_file: use_build_context_synchronously, avoid_print
 
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:nebula_vault/utils/metodosGlobales.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:path/path.dart' as p;
+import 'package:nebula_vault/utils/metodosGlobales.dart';
 
 Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
     List<AssetEntity> files) async {
@@ -12,20 +14,41 @@ Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
     return;
   }
 
-  List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
-    type: RequestType.image | RequestType.video,
-    hasAll: false,
-  );
+  Directory? destino;
 
-  AssetPathEntity? selectedAlbum = await showDialog<AssetPathEntity>(
+  await showDialog(
     context: context,
     builder: (ctx) {
+      final TextEditingController searchController = TextEditingController();
+      final TextEditingController nuevaCarpetaController =
+          TextEditingController();
       String filter = '';
+      Directory base = Directory('/storage/emulated/0/NebulaVault');
+
+      List<Directory> subcarpetas = base
+          .listSync()
+          .whereType<Directory>()
+          .where((d) => d.path
+              .split("/")
+              .last
+              .toLowerCase()
+              .contains(filter.toLowerCase()))
+          .toList();
+
+      void actualizar() {
+        subcarpetas = base
+            .listSync()
+            .whereType<Directory>()
+            .where((d) => d.path
+                .split("/")
+                .last
+                .toLowerCase()
+                .contains(filter.toLowerCase()))
+            .toList();
+      }
+
       return StatefulBuilder(
         builder: (ctx, setState) {
-          final filtered = albums
-              .where((a) => a.name.toLowerCase().contains(filter.toLowerCase()))
-              .toList();
           return AlertDialog(
             title: const Text("Selecciona carpeta destino"),
             content: SizedBox(
@@ -34,21 +57,29 @@ Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
               child: Column(
                 children: [
                   TextField(
+                    controller: searchController,
                     decoration: const InputDecoration(
                       labelText: "Filtrar carpeta",
                       prefixIcon: Icon(Icons.search),
                     ),
-                    onChanged: (v) => setState(() => filter = v),
+                    onChanged: (v) {
+                      filter = v;
+                      setState(actualizar);
+                    },
                   ),
                   const SizedBox(height: 10),
                   Expanded(
                     child: ListView.builder(
-                      itemCount: filtered.length,
+                      itemCount: subcarpetas.length,
                       itemBuilder: (_, i) {
-                        final album = filtered[i];
+                        final carpeta = subcarpetas[i];
+                        final nombre = carpeta.path.split("/").last;
                         return ListTile(
-                          title: Text(album.name),
-                          onTap: () => Navigator.pop(ctx, album),
+                          title: Text(nombre),
+                          onTap: () {
+                            destino = carpeta;
+                            Navigator.pop(ctx);
+                          },
                         );
                       },
                     ),
@@ -60,6 +91,48 @@ Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text("Cancelar"),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final nombre = await showDialog<String>(
+                    context: context,
+                    builder: (ctx2) {
+                      return AlertDialog(
+                        title: const Text("Nombre de nueva carpeta"),
+                        content: TextField(
+                          controller: nuevaCarpetaController,
+                          decoration:
+                              const InputDecoration(hintText: "Ej. MisFotos"),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx2),
+                            child: const Text("Cancelar"),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(
+                                ctx2, nuevaCarpetaController.text.trim()),
+                            child: const Text("Crear"),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+
+                  if (nombre != null && nombre.isNotEmpty) {
+                    final nuevaRuta = Directory('${base.path}/$nombre'.trim());
+
+                    if (!(await nuevaRuta.exists())) {
+                      await nuevaRuta.create(recursive: true);
+                    }
+
+                    destino = nuevaRuta;
+                    mostrarToast(context, "Carpeta creada y seleccionada");
+                    Navigator.pop(ctx);
+                  }
+                },
+                icon: const Icon(Icons.create_new_folder),
+                label: const Text("Nueva carpeta"),
               )
             ],
           );
@@ -68,14 +141,11 @@ Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
     },
   );
 
-  if (selectedAlbum == null) return;
-
-  print(
-      "Álbum destino seleccionado: ${selectedAlbum.name}, id: ${selectedAlbum.id}");
+  if (destino == null) return;
 
   final fileMap = {for (var f in files) f.id: f};
-
   selectedIds = selectedIds.where((id) => fileMap.containsKey(id)).toSet();
+
   if (selectedIds.isEmpty) {
     mostrarToast(context, "No hay archivos válidos para mover");
     return;
@@ -85,38 +155,34 @@ Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
 
   for (final id in selectedIds) {
     final asset = fileMap[id];
-    if (asset == null) {
-      print("❌ Asset no encontrado para id $id");
-      continue;
-    }
+    if (asset == null) continue;
 
     try {
-      print("➡️ Intentando copiar asset: ${asset.title} (${asset.id})");
+      final archivoOriginal = await asset.file;
+      if (archivoOriginal == null) continue;
 
-      final copied = await PhotoManager.editor.copyAssetToPath(
-        asset: asset,
-        pathEntity: selectedAlbum,
-      );
+      final nombre = p.basename(archivoOriginal.path);
+      final destinoFinal = File('${destino!.path}/$nombre');
 
-      if (copied == null) {
-        print("❌ copyAssetToPath retornó null para ${asset.title}");
-        continue;
-      }
+      await archivoOriginal.copy(destinoFinal.path);
 
-      print("✅ Copiado correctamente: ${copied.title}");
+// Reindexa el archivo copiado en MediaStore
+      await PhotoManager.editor.saveImageWithPath(destinoFinal.path);
+//await PhotoManager.editor.saveVideo(destinoFinal);
 
-      final deleted = await PhotoManager.editor.deleteWithIds([asset.id]);
-      print("🗑️ Eliminado original: $deleted");
+// Borra el original de la galería
+      await PhotoManager.editor.deleteWithIds([asset.id]);
 
       movedCount++;
+      print("✅ Movido a ${destinoFinal.path}");
     } catch (e, st) {
-      print("🔥 Error moviendo ${asset.title}: $e\n$st");
+      print("❌ Error al mover $id: $e\n$st");
     }
   }
 
   if (movedCount > 0) {
     mostrarToast(context,
-        "Se movieron $movedCount archivo(s) a '${selectedAlbum.name}'");
+        "Se movieron $movedCount archivo(s) a '${destino!.path.split("/").last}'");
   } else {
     mostrarToast(context, "No se movió ningún archivo");
   }
