@@ -168,23 +168,10 @@ Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
       // Copia el archivo al destino
       await archivoOriginal.copy(destinoFinal.path);
 
-// ✅ Forzar escaneo para que Android lo indexe
+      // Forzar escaneo para que Android lo indexe sin duplicar
       await MediaScanner.loadMedia(path: destinoFinal.path);
 
-      AssetEntity? nuevoAsset;
-      if (asset.type == AssetType.image) {
-        nuevoAsset =
-            await PhotoManager.editor.saveImageWithPath(destinoFinal.path);
-      } else if (asset.type == AssetType.video) {
-        nuevoAsset = await PhotoManager.editor.saveVideo(destinoFinal);
-      }
-
-      if (nuevoAsset == null) {
-        print("⚠️ No se pudo indexar en MediaStore: ${destinoFinal.path}");
-        continue;
-      }
-
-// Borra el original de la galería
+      // Borra el original de la galería
       await PhotoManager.editor.deleteWithIds([asset.id]);
 
       movedCount++;
@@ -195,8 +182,6 @@ Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
   }
 
   if (movedCount > 0) {
-    await PhotoManager.clearFileCache();
-
     mostrarToast(context,
         "Se movieron $movedCount archivo(s) a '${destino!.path.split("/").last}'");
   } else {
