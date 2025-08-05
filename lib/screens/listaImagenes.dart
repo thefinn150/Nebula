@@ -1,6 +1,5 @@
 // ignore_for_file: avoid_print, use_build_context_synchronously, unnecessary_null_comparison, sort_child_properties_last, use_key_in_widget_constructors, library_private_types_in_public_api, prefer_const_constructors_in_immutables, prefer_interpolation_to_compose_strings, unused_local_variable
 
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:nebula_vault/utils/listaImagenesMetodos.dart';
 import 'package:nebula_vault/utils/metodosGlobales.dart';
@@ -8,9 +7,7 @@ import 'package:nebula_vault/widgets/gridImagenes.dart';
 import 'package:nebula_vault/widgets/listaImagenesWidgets.dart';
 import 'package:nebula_vault/widgets/moverSeleccionados.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:extended_image/extended_image.dart';
 import 'package:intl/intl.dart';
-import 'pantallaCompleta.dart';
 
 class FileListScreen extends StatefulWidget {
   final AssetPathEntity folder;
@@ -49,34 +46,34 @@ class _FileListScreenState extends State<FileListScreen> {
 
   final ScrollController _scrollController = ScrollController();
 
+  late Future<void> _initialDataFuture; // añadido
+
   @override
   void initState() {
     super.initState();
     pedirPermisosCompletos();
-    _loadInitialData();
+    _initialDataFuture = _loadInitialData(); // añadido
   }
 
-  void _loadInitialData() async {
+  Future<void> _loadInitialData() async {
     final fav = await cargarFavoritos();
     final datos = await cargarArchivosDesdeFolder(widget.folder);
 
-    setState(() {
-      favorites = fav;
-      files = datos.todos;
-      images = datos.imagenes;
-      gifs = datos.gifs;
-      videos = datos.videos;
+    favorites = fav;
+    files = datos.todos;
+    images = datos.imagenes;
+    gifs = datos.gifs;
+    videos = datos.videos;
 
-      groupedImages = datos.groupedImages;
-      groupedGifs = datos.groupedGifs;
-      groupedVideos = datos.groupedVideos;
+    groupedImages = datos.groupedImages;
+    groupedGifs = datos.groupedGifs;
+    groupedVideos = datos.groupedVideos;
 
-      orderedImageDates = datos.fechasImagenes;
-      orderedGifDates = datos.fechasGifs;
-      orderedVideoDates = datos.fechasVideos;
+    orderedImageDates = datos.fechasImagenes;
+    orderedGifDates = datos.fechasGifs;
+    orderedVideoDates = datos.fechasVideos;
 
-      isLoading = false;
-    });
+    isLoading = false;
   }
 
   List<AssetEntity> _getCurrentList() {
@@ -104,6 +101,7 @@ class _FileListScreenState extends State<FileListScreen> {
     }
   }
 
+// aqui se pone el gridContent y las fechas de cada grid
   Widget _buildContent() {
     final files = _getCurrentList();
 
@@ -115,26 +113,38 @@ class _FileListScreenState extends State<FileListScreen> {
       return Scrollbar(
         controller: _scrollController,
         interactive: true,
-        thickness: 30,
-        scrollbarOrientation: ScrollbarOrientation.left,
+        thickness: 25,
+        radius: const Radius.circular(12),
+        scrollbarOrientation: ScrollbarOrientation.right,
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
             buildGrid(
-                context: context,
-                files: files,
-                isSel: isSel,
-                selectedIds: selectedIds,
-                favorites: favorites,
-                folderName: widget.folder.name,
-                currentList: files,
-                onReload: _loadInitialData,
-                onUpdateFavorites: (Set<String> newFavorites) {
-                  setState(() {
-                    favorites = newFavorites;
-                  });
-                },
-                setState: setState)
+              context: context,
+              files: files,
+              isSel: isSel,
+              selectedIds: selectedIds,
+              favorites: favorites,
+              folderName: widget.folder.name,
+              currentList: files,
+              onReload: () {
+                setState(() {
+                  _initialDataFuture = _loadInitialData();
+                });
+              },
+              onUpdateFavorites: (Set<String> newFavorites) {
+                setState(() {
+                  favorites = newFavorites;
+                });
+              },
+              setState: setState,
+              onSelectionModeChanged: (bool enable) {
+                setState(() {
+                  isSel = enable;
+                  if (!enable) selectedIds.clear();
+                });
+              },
+            )
           ],
         ),
       );
@@ -152,70 +162,95 @@ class _FileListScreenState extends State<FileListScreen> {
       'Videos': orderedVideoDates,
     }[selectedFilter]!;
 
-    final int itemCount = orderedDates.isEmpty
-        ? 0
-        : orderedDates
-            .map((date) => grouped[date]!.length)
-            .reduce((a, b) => a + b);
-
     return Scrollbar(
       interactive: true,
-      thickness: 30,
+      thickness: 25,
+      radius: const Radius.circular(12),
       controller: _scrollController,
-      scrollbarOrientation: ScrollbarOrientation.left,
+      scrollbarOrientation: ScrollbarOrientation.right,
       child: CustomScrollView(
         controller: _scrollController,
         slivers: [
           for (var date in orderedDates) ...[
             buildSectionHeader(
-                date + " (" + grouped[date]!.length.toString() + ")",
-                date,
-                selectedDates,
-                groupedImages,
-                groupedGifs,
-                groupedVideos,
-                selectedIds,
-                isSel,
-                selectedFilter,
-                setState),
+              date + " (" + grouped[date]!.length.toString() + ")",
+              date,
+              selectedDates,
+              groupedImages,
+              groupedGifs,
+              groupedVideos,
+              selectedIds,
+              isSel,
+              selectedFilter,
+              setState,
+              onSelectionModeChanged: (bool enable) {
+                setState(() {
+                  isSel = enable;
+                  if (!enable) selectedIds.clear();
+                });
+              },
+            ),
             buildGrid(
-                context: context,
-                files: grouped[date]!,
-                isSel: isSel,
-                selectedIds: selectedIds,
-                favorites: favorites,
-                folderName: widget.folder.name,
-                currentList: files,
-                onReload: _loadInitialData,
-                onUpdateFavorites: (Set<String> newFavorites) {
-                  setState(() {
-                    favorites = newFavorites;
-                  });
-                },
-                setState: setState),
+              context: context,
+              files: grouped[date]!,
+              isSel: isSel,
+              selectedIds: selectedIds,
+              favorites: favorites,
+              folderName: widget.folder.name,
+              currentList: files,
+              onReload: () {
+                setState(() {
+                  _initialDataFuture = _loadInitialData();
+                });
+              },
+              onUpdateFavorites: (Set<String> newFavorites) {
+                setState(() {
+                  favorites = newFavorites;
+                });
+              },
+              setState: setState,
+              onSelectionModeChanged: (bool enable) {
+                setState(() {
+                  isSel = enable;
+                  if (!enable) selectedIds.clear();
+                });
+              },
+            ),
           ]
         ],
       ),
     );
   }
 
+//aqui esta el app, con los botones de mover y eliminar y el boton de modo seleccion, asi mismo se carga el contenido del widget
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: !isSel
-            ? Text(widget.folder.name + " (" + files.length.toString() + ")")
+            ? Text(widget.folder.name +
+                " (" +
+                (selectedFilter == 'Imágenes'
+                    ? images.length.toString()
+                    : selectedFilter == 'Videos'
+                        ? videos.length.toString()
+                        : gifs.length.toString()) +
+                ")")
             : Text(" (" +
                 selectedIds.length.toString() +
                 " de " +
-                files.length.toString() +
+                (selectedFilter == 'Imágenes'
+                    ? images.length.toString()
+                    : selectedFilter == 'Videos'
+                        ? videos.length.toString()
+                        : gifs.length.toString()) +
                 ")"),
         actions: [
           Row(
             children: [
-              if (selectedFilter == 'Videos' && videos.isNotEmpty)
+              if (selectedFilter == 'Videos' && videos.isNotEmpty && !isSel)
                 const Text('Duración', style: TextStyle(color: Colors.white)),
-              if (selectedFilter == 'Videos' && videos.isNotEmpty)
+              if (selectedFilter == 'Videos' && videos.isNotEmpty && !isSel)
                 Switch(
                   value: sortVideosByDuration,
                   onChanged: (value) {
@@ -236,7 +271,7 @@ class _FileListScreenState extends State<FileListScreen> {
                       builder: (ctx) => AlertDialog(
                         title: const Text("¿Mover elementos?"),
                         content: const Text(
-                            "Se moveran a la carpeta que selecciones."),
+                            "Se moverán a la carpeta que selecciones."),
                         actions: [
                           TextButton(
                             child: const Text("Cancelar"),
@@ -256,7 +291,7 @@ class _FileListScreenState extends State<FileListScreen> {
                         setState(() {
                           isSel = false;
                           selectedIds.clear();
-                          _loadInitialData(); // asumiendo que esta es una función sincrónica
+                          _initialDataFuture = _loadInitialData();
                         });
                       });
                     }
@@ -290,7 +325,7 @@ class _FileListScreenState extends State<FileListScreen> {
                         setState(() {
                           isSel = false;
                           selectedIds.clear();
-                          _loadInitialData();
+                          _initialDataFuture = _loadInitialData();
                         });
                       });
                     }
@@ -327,7 +362,7 @@ class _FileListScreenState extends State<FileListScreen> {
                             ]
                           : [],
                     ),
-                    padding: const EdgeInsets.all(6), // Más compacto
+                    padding: const EdgeInsets.all(6),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
                       transitionBuilder: (child, animation) => ScaleTransition(
@@ -338,7 +373,7 @@ class _FileListScreenState extends State<FileListScreen> {
                         isSel ? Icons.check : Icons.radio_button_unchecked,
                         key: ValueKey<bool>(isSel),
                         color: Colors.white,
-                        size: 20, // Más pequeño y limpio
+                        size: 20,
                       ),
                     ),
                   ),
@@ -348,9 +383,15 @@ class _FileListScreenState extends State<FileListScreen> {
           ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _buildContent(),
+      body: FutureBuilder<void>(
+        future: _initialDataFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return _buildContent();
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final nuevoFiltro = await showFilterMenu(

@@ -5,6 +5,7 @@ import 'package:nebula_vault/utils/metodosGlobales.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:extended_image/extended_image.dart';
 
+// este widget carga la imagen predefinida para la el registro en la lista
 Widget buildGrid({
   required BuildContext context,
   required List<AssetEntity> files,
@@ -16,6 +17,7 @@ Widget buildGrid({
   required void Function() onReload,
   required void Function(Set<String>) onUpdateFavorites,
   required Function setState,
+  required void Function(bool enable) onSelectionModeChanged,
 }) {
   return SliverPadding(
     padding: const EdgeInsets.all(4),
@@ -65,6 +67,10 @@ Widget buildGrid({
                       }
                     },
                     onLongPress: () {
+                      if (!isSel) {
+                        onSelectionModeChanged(
+                            true); // ✅ activa selección si no estaba activa
+                      }
                       setState(() {
                         if (isSelected) {
                           selectedIds.remove(file.id);
@@ -92,37 +98,50 @@ Widget buildGrid({
                   ),
 
                   // ÍCONO DE FAVORITO o FULLSCREEN
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: GestureDetector(
-                      onTap: () async {
-                        if (!isSel) {
-                          final nuevosFavoritos =
-                              await agregarFavorito(context, file);
-                          onUpdateFavorites(nuevosFavoritos);
-                          setState(() {});
-                        } else {
-                          final globalIndex = currentList.indexOf(file);
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ViewerScreen(
-                                files: currentList,
-                                index: globalIndex,
-                                nameFolder: folderName,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      child: Icon(
-                        !isSel
-                            ? (isFavorite ? Icons.star : Icons.star_border)
-                            : Icons.fullscreen,
-                        color: isSel ? Colors.white : Colors.yellowAccent,
+
+                  Stack(
+                    children: [
+                      // ⭐ Ícono de estrella, siempre a la izquierda
+                      Positioned(
+                        top: 4,
+                        left: 4,
+                        child: GestureDetector(
+                          onTap: () async {
+                            final nuevosFavoritos =
+                                await agregarFavorito(context, file);
+                            onUpdateFavorites(nuevosFavoritos);
+                          },
+                          child: Icon(
+                            isFavorite ? Icons.star : Icons.star_border,
+                            color: Colors.yellowAccent,
+                          ),
+                        ),
                       ),
-                    ),
+
+                      // 🔍 Ícono de fullscreen, solo si isSel es true, siempre a la derecha
+                      if (isSel)
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () async {
+                              final globalIndex = currentList.indexOf(file);
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ViewerScreen(
+                                    files: currentList,
+                                    index: globalIndex,
+                                    nameFolder: folderName,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Icon(Icons.fullscreen,
+                                color: Colors.white),
+                          ),
+                        ),
+                    ],
                   ),
 
                   // ÍCONO DE VIDEO + DURACIÓN

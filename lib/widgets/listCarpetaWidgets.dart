@@ -1,53 +1,88 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:nebula_vault/screens/listaImagenes.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:nebula_vault/utils/listaCarpetaMetodos.dart';
 import 'dart:typed_data';
 
 Widget buildSubtitleAndIcons(Map<String, int> counts) {
-  List<Widget> parts = [];
+  List<Widget> iconWidgets = [];
 
   if (counts['images']! > 0) {
-    parts.add(Row(
+    iconWidgets.add(Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.image_outlined, size: 16, color: Colors.blueAccent),
+        const Icon(Icons.image_outlined, size: 12, color: Colors.blueAccent),
         const SizedBox(width: 4),
-        Text('${counts['images']}'),
+        Text('${counts['images']}', style: const TextStyle(fontSize: 12)),
       ],
     ));
   }
 
   if (counts['gifs']! > 0) {
-    parts.add(Row(
+    iconWidgets.add(Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('🎞️', style: TextStyle(fontSize: 16)),
+        const Icon(Icons.gif_box_outlined,
+            size: 12, color: Colors.yellowAccent),
         const SizedBox(width: 4),
-        Text('${counts['gifs']}'),
+        Text('${counts['gifs']}', style: const TextStyle(fontSize: 12)),
       ],
     ));
   }
 
   if (counts['videos']! > 0) {
-    parts.add(Row(
+    iconWidgets.add(Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.videocam_outlined, size: 16, color: Colors.redAccent),
+        const Icon(Icons.videocam_outlined, size: 12, color: Colors.redAccent),
         const SizedBox(width: 4),
-        Text('${counts['videos']}'),
+        Text('${counts['videos']}', style: const TextStyle(fontSize: 12)),
       ],
     ));
   }
 
-  return Row(
+  if (iconWidgets.isEmpty) {
+    return const Text('Vacío');
+  }
+
+  // Agrupar los widgets en dos filas
+  List<Widget> firstRow = [];
+  List<Widget> secondRow = [];
+
+  for (int i = 0; i < iconWidgets.length; i++) {
+    if (iconWidgets.length == 2 || iconWidgets.length == 1) {
+      final widget = Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: Column(
+            children: [
+              iconWidgets[i],
+              const SizedBox(height: 14), // Espacio
+            ],
+          ));
+      firstRow.add(widget);
+    } else {
+      final widget = Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: iconWidgets[i],
+      );
+
+      if (i < 2) {
+        firstRow.add(widget);
+      } else {
+        secondRow.add(widget);
+      }
+    }
+  }
+
+  return Column(
     mainAxisSize: MainAxisSize.min,
-    children: parts.isEmpty
-        ? [const Text('Vacío')]
-        : parts
-            .map((w) =>
-                Padding(padding: const EdgeInsets.only(right: 8), child: w))
-            .toList(),
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(mainAxisSize: MainAxisSize.min, children: firstRow),
+      if (secondRow.isNotEmpty)
+        Row(mainAxisSize: MainAxisSize.min, children: secondRow),
+    ],
   );
 }
 
@@ -185,7 +220,12 @@ Widget buildFolderCard(
                     return const SizedBox(height: 16);
                   }
                   final counts = snapshot.data ?? {};
-                  return buildSubtitleAndIcons(counts);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      buildSubtitleAndIcons(counts),
+                    ],
+                  );
                 },
               ),
             ],

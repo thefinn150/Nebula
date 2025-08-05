@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:nebula_vault/utils/metodosGlobales.dart';
+import 'package:media_scanner/media_scanner.dart';
 
 Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
     List<AssetEntity> files) async {
@@ -164,11 +165,24 @@ Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
       final nombre = p.basename(archivoOriginal.path);
       final destinoFinal = File('${destino!.path}/$nombre');
 
+      // Copia el archivo al destino
       await archivoOriginal.copy(destinoFinal.path);
 
-// Reindexa el archivo copiado en MediaStore
-      await PhotoManager.editor.saveImageWithPath(destinoFinal.path);
-//await PhotoManager.editor.saveVideo(destinoFinal);
+// ✅ Forzar escaneo para que Android lo indexe
+      await MediaScanner.loadMedia(path: destinoFinal.path);
+
+      AssetEntity? nuevoAsset;
+      if (asset.type == AssetType.image) {
+        nuevoAsset =
+            await PhotoManager.editor.saveImageWithPath(destinoFinal.path);
+      } else if (asset.type == AssetType.video) {
+        nuevoAsset = await PhotoManager.editor.saveVideo(destinoFinal);
+      }
+
+      if (nuevoAsset == null) {
+        print("⚠️ No se pudo indexar en MediaStore: ${destinoFinal.path}");
+        continue;
+      }
 
 // Borra el original de la galería
       await PhotoManager.editor.deleteWithIds([asset.id]);
@@ -181,9 +195,13 @@ Future<void> moverSeleccionados(BuildContext context, Set<String> selectedIds,
   }
 
   if (movedCount > 0) {
+    await PhotoManager.clearFileCache();
+
     mostrarToast(context,
         "Se movieron $movedCount archivo(s) a '${destino!.path.split("/").last}'");
   } else {
     mostrarToast(context, "No se movió ningún archivo");
   }
+
+  await PhotoManager.clearFileCache();
 }

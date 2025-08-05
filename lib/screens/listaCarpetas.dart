@@ -45,6 +45,7 @@ class _GaleriaHomeState extends State<GaleriaHome> {
   void initState() {
     super.initState();
     loadInitialData();
+    _loadFolders();
   }
 
   void loadInitialData() async {
@@ -109,19 +110,41 @@ class _GaleriaHomeState extends State<GaleriaHome> {
   Widget _buildInicioView() {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(8),
-          child: TextField(
-            onChanged: _filterFolders,
-            decoration: InputDecoration(
-              hintText: 'Buscar carpeta...',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+        //barra de busqueda
+        Row(
+          children: [
+            Expanded(
+              flex: 1,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  '(' + filteredFolders.length.toString() + ' carpetas)',
+                  style: Theme.of(context).textTheme.headline6,
+                ),
               ),
             ),
-          ),
+            Expanded(
+              // Mitad derecha
+              flex: 1,
+              child: SizedBox(
+                height: 50,
+                child: TextField(
+                  onChanged: _filterFolders,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
+
+        // lista de carpetas
+        const SizedBox(height: 8.0),
         Expanded(
           child: Builder(
             builder: (_) {
@@ -133,32 +156,29 @@ class _GaleriaHomeState extends State<GaleriaHome> {
                   .toList();
 
               List<Widget> buildFolderRows(List<AssetPathEntity> folders) {
-                return List.generate((folders.length / 2).ceil(), (index) {
-                  final first = folders[index * 2];
-                  final second = (index * 2 + 1 < folders.length)
-                      ? folders[index * 2 + 1]
-                      : null;
+                const int carpetasPorFila = 3;
 
-                  return Row(
-                    children: [
-                      Expanded(
-                          child: buildFolderCard(
-                        first,
-                        folderThumbnailsMap,
-                        loadInitialData,
-                        _filterFolders,
-                      )),
-                      if (second != null)
-                        Expanded(
-                            child: buildFolderCard(
-                          second,
+                return List.generate((folders.length / carpetasPorFila).ceil(),
+                    (index) {
+                  final rowItems = List.generate(carpetasPorFila, (i) {
+                    final realIndex = index * carpetasPorFila + i;
+                    if (realIndex < folders.length) {
+                      return Expanded(
+                        child: buildFolderCard(
+                          folders[realIndex],
                           folderThumbnailsMap,
                           loadInitialData,
                           _filterFolders,
-                        ))
-                      else
-                        const Expanded(child: SizedBox()),
-                    ],
+                        ),
+                      );
+                    } else {
+                      return const Expanded(child: SizedBox()); // Relleno vacío
+                    }
+                  });
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(children: rowItems),
                   );
                 });
               }
@@ -193,6 +213,7 @@ class _GaleriaHomeState extends State<GaleriaHome> {
     );
   }
 
+// seleccion entre normal y favoritos
   Widget _buildBody() {
     if (_selectedIndex == 0) {
       return isLoading
@@ -207,10 +228,11 @@ class _GaleriaHomeState extends State<GaleriaHome> {
     }
   }
 
+  // navegacion barra inferior
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nebula Vault')),
+      appBar: AppBar(title: const Text('Nebula Vault ')),
       body: _buildBody(),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Theme.of(context).colorScheme.shadow,
@@ -226,10 +248,6 @@ class _GaleriaHomeState extends State<GaleriaHome> {
           BottomNavigationBarItem(
             icon: Icon(Icons.favorite_border),
             label: 'Favoritos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.more_horiz),
-            label: 'Más',
           ),
         ],
       ),

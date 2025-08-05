@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+//boton de icono de filtro
 Future<String?> showFilterMenu(
   BuildContext context,
   List<AssetEntity> images,
@@ -20,7 +21,7 @@ Future<String?> showFilterMenu(
         children: [
           const SizedBox(height: 12),
           const Text(
-            'Filtrar por tipo de archivo',
+            'Filtrar por:',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -48,17 +49,20 @@ Future<String?> showFilterMenu(
   );
 }
 
+// aqui estan las fechas y el icono de seleccionar todos los de esa fecha
 Widget buildSectionHeader(
-    String title,
-    String date,
-    List<String> selectedDates,
-    Map<String, List<AssetEntity>> groupedImages,
-    Map<String, List<AssetEntity>> groupedGifs,
-    Map<String, List<AssetEntity>> groupedVideos,
-    Set<String> selectedIds,
-    bool isSel,
-    String selectedFilter,
-    Function setState) {
+  String title,
+  String date,
+  List<String> selectedDates,
+  Map<String, List<AssetEntity>> groupedImages,
+  Map<String, List<AssetEntity>> groupedGifs,
+  Map<String, List<AssetEntity>> groupedVideos,
+  Set<String> selectedIds,
+  bool isSel,
+  String selectedFilter,
+  void Function(void Function()) setState, {
+  required void Function(bool) onSelectionModeChanged,
+}) {
   return SliverToBoxAdapter(
     child: Container(
       width: double.infinity,
@@ -100,10 +104,11 @@ Widget buildSectionHeader(
                   selectedIds.add(asset.id);
                 }
               }
-              print("*****************" + selectedIds.toString());
-              isSel = true;
-              print("*****************" + isSel.toString());
-              setState(() {});
+              if (!isSel) {
+                onSelectionModeChanged(
+                    true); // ✅ activa selección si no estaba activa
+              }
+              setState;
             },
           ),
         ],
