@@ -159,21 +159,75 @@ class _ViewerScreenState extends State<ViewerScreen> {
 
       // Botones discretos en la parte inferior:
       bottomNavigationBar: Container(
-        color: Colors.grey.withOpacity(0.1),
+        color: favorites.contains(widget.files[current].id)
+            ? Colors.yellow.withOpacity(0.3)
+            : Colors.grey.withOpacity(0.1),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            // Detalles
-            IconButton(
-              icon: const Icon(Icons.info_outline, color: Colors.white),
-              tooltip: 'Detalles del archivo',
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.blue.withOpacity(0.5),
+            // Eliminar
+            isLoadingDelete
+                ? const CircularProgressIndicator(color: Colors.white)
+                : IconButton(
+                    icon: const Icon(Icons.delete_outline,
+                        color: Colors.redAccent),
+                    tooltip: 'Eliminar archivo',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.red.withOpacity(0.5),
+                    ),
+                    focusColor: Colors.redAccent,
+                    splashColor: Colors.red,
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Confirmar eliminación'),
+                          content: const Text(
+                              '¿Eliminar este archivo permanentemente?'),
+                          actions: [
+                            TextButton(
+                              child: const Text('Cancelar'),
+                              onPressed: () => Navigator.pop(ctx, false),
+                            ),
+                            TextButton(
+                              child: const Text('Eliminar'),
+                              onPressed: () => Navigator.pop(ctx, true),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirmed == true) {
+                        isLoadingDelete =
+                            await borrarActual(context, widget.files[current]);
+                        Navigator.pop(context, true);
+                      }
+                    },
+                  ),
+
+            ElevatedButton(
+              onPressed: () async {
+                await setFolderThumbnail(
+                  context: context,
+                  folderName: widget.nameFolder,
+                  asset: widget.files[current],
+                );
+                setState(() {});
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey,
+                shape: const CircleBorder(),
+                padding: const EdgeInsets.all(8),
               ),
-              focusColor: Colors.blueAccent,
-              splashColor: Colors.blue,
-              onPressed: () => mostrarDetalles(context, widget.files[current]),
+              child: Text(
+                '${current + 1}', // Mostrar el número humano (inicia en 1)
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
 
             IconButton(
@@ -216,45 +270,16 @@ class _ViewerScreenState extends State<ViewerScreen> {
               },
             ),
 
-            // Eliminar
-            isLoadingDelete
-                ? const CircularProgressIndicator(color: Colors.white)
-                : IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: Colors.redAccent),
-                    tooltip: 'Eliminar archivo',
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.red.withOpacity(0.5),
-                    ),
-                    focusColor: Colors.redAccent,
-                    splashColor: Colors.red,
-                    onPressed: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Confirmar eliminación'),
-                          content: const Text(
-                              '¿Eliminar este archivo permanentemente?'),
-                          actions: [
-                            TextButton(
-                              child: const Text('Cancelar'),
-                              onPressed: () => Navigator.pop(ctx, false),
-                            ),
-                            TextButton(
-                              child: const Text('Eliminar'),
-                              onPressed: () => Navigator.pop(ctx, true),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (confirmed == true) {
-                        isLoadingDelete =
-                            await borrarActual(context, widget.files[current]);
-                        Navigator.pop(context, true);
-                      }
-                    },
-                  ),
+            IconButton(
+              icon: const Icon(Icons.info_outline, color: Colors.white),
+              tooltip: 'Detalles del archivo',
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.blue.withOpacity(0.5),
+              ),
+              focusColor: Colors.blueAccent,
+              splashColor: Colors.blue,
+              onPressed: () => mostrarDetalles(context, widget.files[current]),
+            ),
           ],
         ),
       ),
